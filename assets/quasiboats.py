@@ -552,8 +552,13 @@ class QuasiBoats(Activity):
         key = event.get_key()
         print(f"on_boat_key: Key {key} pressed for boat at ({boat.row}, {boat.col}), move_locked: {self.move_locked}")
         if key == lv.KEY.ENTER or key == ord("A") or key == ord("a"):
-            self.move_locked = not self.move_locked
-            lv.group_get_default().set_editing(self.move_locked)
+            # First, set the editing mode based on the *new* move_locked state
+            new_move_locked_state = not self.move_locked
+            lv.group_get_default().set_editing(new_move_locked_state)
+            
+            # Then, toggle the move_locked state
+            self.move_locked = new_move_locked_state
+            
             self._update_boat_drag_visuals(boat)
             print(f"on_boat_key: move_locked toggled to {self.move_locked}")
             event.stop_bubbling() # Stop event from propagating to screen
@@ -589,11 +594,15 @@ class QuasiBoats(Activity):
     def on_boat_defocused(self, event, boat):
         """Remove highlight when focus lost"""
         print(f"on_boat_defocused: Boat at ({boat.row}, {boat.col}) defocused")
-        # Always clear visuals when defocused, regardless of dragging_boat or move_locked
+        # If move_locked is True, we want the boat to remain visually focused.
+        # Do not clear visuals or change editing mode.
+        if self.move_locked:
+            return
+        
         boat.selected = False
         self.clear_drag_dots()
         boat.img.set_style_outline_width(0, 0)
-        # Do NOT set editing mode here. It is managed by on_boat_key when move_locked changes.
+        # The editing mode is managed by on_boat_key when move_locked changes.
 
     def on_boat_pressed(self, event, boat):
         """Handle boat press start (touch)"""
@@ -857,6 +866,7 @@ class QuasiBoats(Activity):
 
     def _update_boat_drag_visuals(self, boat):
         """Update boat visual feedback for dragging (red border, dots)"""
+        print(f"_update_boat_drag_visuals: boat at ({boat.row}, {boat.col}), selected: {boat.selected}, move_locked: {self.move_locked}")
         if boat.selected:
             if self.move_locked:
                 boat.img.set_style_outline_width(3, 0)
