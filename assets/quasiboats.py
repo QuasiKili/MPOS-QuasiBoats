@@ -350,7 +350,7 @@ class QuasiBoats(Activity):
         self._add_focus_style(size_minus_btn)
         if focusgroup:
             focusgroup.add_obj(size_minus_btn)
-            focusgroup.focus_obj(size_minus_btn)
+            emulate_focus_obj(focusgroup, size_minus_btn)
 
         size_plus_btn = lv.button(size_container)
         size_plus_btn.set_size(45, 30)
