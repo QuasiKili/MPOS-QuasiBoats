@@ -550,25 +550,50 @@ class QuasiBoats(Activity):
     def on_boat_key(self, event, boat):
         """Handle key events for individual boats"""
         key = event.get_key()
+        print(f"on_boat_key: Key {key} pressed for boat at ({boat.row}, {boat.col}), move_locked: {self.move_locked}")
         if key == lv.KEY.ENTER or key == ord("A") or key == ord("a"):
             self.move_locked = not self.move_locked
+            lv.group_get_default().set_editing(self.move_locked)
             self._update_boat_drag_visuals(boat)
-            return # Stop event from propagating to screen
+            print(f"on_boat_key: move_locked toggled to {self.move_locked}")
+            event.stop_bubbling() # Stop event from propagating to screen
+            return
+        
+        if self.move_locked:
+            if key == lv.KEY.UP:
+                self.move_selected_boat("up")
+                emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
+                event.stop_bubbling()
+            elif key == lv.KEY.DOWN:
+                self.move_selected_boat("down")
+                emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
+                event.stop_bubbling()
+            elif key == lv.KEY.LEFT:
+                self.move_selected_boat("left")
+                emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
+                event.stop_bubbling()
+            elif key == lv.KEY.RIGHT:
+                self.move_selected_boat("right")
+                emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
+                event.stop_bubbling()
+        # If not move_locked, let the event bubble up for focus navigation (no else needed)
 
     def on_boat_focused(self, event, boat):
         """Highlight boat when focused with keyboard"""
+        print(f"on_boat_focused: Boat at ({boat.row}, {boat.col}) focused")
         self.selected_boat = boat
         boat.selected = True
-        # Only update visuals if not already in move_locked state (from Enter press)
-        if not self.move_locked:
-            self._update_boat_drag_visuals(boat)
+        # Update visuals based on current move_locked state
+        self._update_boat_drag_visuals(boat)
 
     def on_boat_defocused(self, event, boat):
         """Remove highlight when focus lost"""
+        print(f"on_boat_defocused: Boat at ({boat.row}, {boat.col}) defocused")
         # Always clear visuals when defocused, regardless of dragging_boat or move_locked
         boat.selected = False
         self.clear_drag_dots()
         boat.img.set_style_outline_width(0, 0)
+        # Do NOT set editing mode here. It is managed by on_boat_key when move_locked changes.
 
     def on_boat_pressed(self, event, boat):
         """Handle boat press start (touch)"""
@@ -683,7 +708,9 @@ class QuasiBoats(Activity):
 
     def move_selected_boat(self, direction):
         """Move selected boat with keyboard (only when Enter/A is held)"""
+        print(f"move_selected_boat: Direction {direction}, move_locked: {self.move_locked}")
         if not self.selected_boat or self.game_won or not self.move_locked:
+            print("move_selected_boat: Conditions not met for movement")
             return
 
         boat = self.selected_boat
@@ -801,22 +828,8 @@ class QuasiBoats(Activity):
         if self.menu_modal:
             return
         # Arrow keys move boat when locked
-        if self.selected_boat and self.move_locked:
-            if key == lv.KEY.UP:
-                self.move_selected_boat("up")
-                print("upppp")
-                event.stop_bubbling() # Consume event
-            elif key == lv.KEY.DOWN:
-                self.move_selected_boat("down")
-                event.stop_bubbling() # Consume event
-            elif key == lv.KEY.LEFT:
-                self.move_selected_boat("left")
-                event.stop_bubbling() # Consume event
-            elif key == lv.KEY.RIGHT:
-                self.move_selected_boat("right")
-                event.stop_bubbling() # Consume event
-
-        if key == ord("R") or key == ord("r"):
+        # Arrow keys move boat when locked (handled by boat's on_boat_key)
+        elif key == ord("R") or key == ord("r"):
             self.on_reset(event)
         elif key == ord("N") or key == ord("n"):
             self.on_new_game(event)
