@@ -1,3 +1,4 @@
+
 import time
 import random
 
@@ -553,6 +554,9 @@ class QuasiBoats(Activity):
         if key == lv.KEY.ENTER or key == ord("A") or key == ord("a"):
             self.move_locked = not self.move_locked
             self._update_boat_drag_visuals(boat)
+            focusgroup = lv.group_get_default()
+            if focusgroup:
+                focusgroup.set_editing(self.move_locked) # Enable/disable editing mode
             return # Stop event from propagating to screen
 
     def on_boat_focused(self, event, boat):
@@ -800,23 +804,17 @@ class QuasiBoats(Activity):
         # Don't process game keys if menu is open
         if self.menu_modal:
             return
-        # Arrow keys move boat when locked
-        if self.selected_boat and self.move_locked:
-            if key == lv.KEY.UP:
-                self.move_selected_boat("up")
-                print("upppp")
-                event.stop_bubbling() # Consume event
-            elif key == lv.KEY.DOWN:
-                self.move_selected_boat("down")
-                event.stop_bubbling() # Consume event
-            elif key == lv.KEY.LEFT:
-                self.move_selected_boat("left")
-                event.stop_bubbling() # Consume event
-            elif key == lv.KEY.RIGHT:
-                self.move_selected_boat("right")
-                event.stop_bubbling() # Consume event
 
-        if key == ord("R") or key == ord("r"):
+        # Arrow keys move boat when locked
+        if key == lv.KEY.UP:
+            self.move_selected_boat("up")
+        elif key == lv.KEY.DOWN:
+            self.move_selected_boat("down")
+        elif key == lv.KEY.LEFT:
+            self.move_selected_boat("left")
+        elif key == lv.KEY.RIGHT:
+            self.move_selected_boat("right")
+        elif key == ord("R") or key == ord("r"):
             self.on_reset(event)
         elif key == ord("N") or key == ord("n"):
             self.on_new_game(event)
