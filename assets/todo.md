@@ -1,0 +1,9 @@
+- last row and column partly outside grid
+- dragging with arrows just expands selection, no moving
+- menu buttons not showing the arrow key focus
+- menu button can still be pressed with enter while menu open (weird darker and darker behavior, should check if already open)
+- menu items overlap in menu popup
+- new game in both game screen and menu popup
+- scale boat images
+- game not always solvable
+- you can drag boats past another boats if there's space behind them

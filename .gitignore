@@ -1,0 +1,14 @@
+trash/
+
+conf.json*
+
+# macOS file:
+.DS_Store
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+
