@@ -38,7 +38,7 @@ class Boat:
         return cells
 
     def can_move_to(self, new_row, new_col, grid_size, all_boats):
-        """Check if boat can move to new position"""
+        """Check if boat can move to new position, checking for path blocking"""
         # Check bounds
         if new_row < 0 or new_col < 0:
             return False
@@ -49,23 +49,39 @@ class Boat:
             if new_row + self.length > grid_size or new_col >= grid_size:
                 return False
 
-        # Get new cells
-        new_cells = []
+        # Check path
+        if self.is_horizontal:
+            step = 1 if new_col > self.col else -1
+            curr_col = self.col
+            while curr_col != new_col:
+                curr_col += step
+                if not self._is_pos_free(self.row, curr_col, all_boats):
+                    return False
+        else:
+            step = 1 if new_row > self.row else -1
+            curr_row = self.row
+            while curr_row != new_row:
+                curr_row += step
+                if not self._is_pos_free(curr_row, self.col, all_boats):
+                    return False
+
+        return True
+
+    def _is_pos_free(self, row, col, all_boats):
+        """Check if boat can be at this position (row, col) without overlap"""
+        new_cells_set = set()
         for i in range(self.length):
             if self.is_horizontal:
-                new_cells.append((new_row, new_col + i))
+                new_cells_set.add((row, col + i))
             else:
-                new_cells.append((new_row + i, new_col))
-
-        # Check if new cells are occupied by other boats
-        new_cells_set = set(new_cells)
+                new_cells_set.add((row + i, col))
+        
         for boat in all_boats:
             if boat is self:
                 continue
-            occupied = set(boat.get_cells())
-            if new_cells_set & occupied:
-                return False
-
+            for cell in boat.get_cells():
+                if cell in new_cells_set:
+                    return False
         return True
 
 
@@ -175,14 +191,16 @@ class QuasiBoats(Activity):
         self.water_bg.remove_flag(lv.obj.FLAG.SCROLLABLE)
 
         # Create grid container (fixed size, aligned left)
-        grid_pixel_size = self.grid_size * self.cell_size
+        # Added 4px for border to avoid clipping
+        grid_pixel_size = self.grid_size * self.cell_size + 4
 
         self.grid_container = lv.obj(self.screen)
         self.grid_container.set_size(grid_pixel_size, grid_pixel_size)
-        self.grid_container.set_pos(self.grid_offset_x, self.grid_offset_y)
+        self.grid_container.set_pos(self.grid_offset_x - 2, self.grid_offset_y - 2)
         self.grid_container.set_style_bg_opa(0, 0)  # Transparent
         self.grid_container.set_style_border_width(2, 0)
         self.grid_container.set_style_border_color(lv.color_hex(0x2C3E50), 0)
+        self.grid_container.set_style_pad_all(2, 0)  # Avoid clipping
         self.grid_container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
         self.grid_container.remove_flag(lv.obj.FLAG.SCROLLABLE)
 
@@ -205,7 +223,8 @@ class QuasiBoats(Activity):
         arrow_label.center()
 
         # Right panel - Info and controls
-        right_panel_x = self.grid_offset_x + grid_pixel_size + 5
+        right_panel_content_size = self.grid_size * self.cell_size
+        right_panel_x = self.grid_offset_x + right_panel_content_size + 5
 
         # Seed display
         self.seed_label = lv.label(self.screen)
@@ -231,33 +250,36 @@ class QuasiBoats(Activity):
 
         # Menu button
         menu_btn = lv.button(self.screen)
-        menu_btn.set_size(75, 30)
+        menu_btn.set_size(75, 35)
         menu_btn.set_pos(right_panel_x, 100)
         menu_btn.add_event_cb(self.show_menu, lv.EVENT.CLICKED, None)
         menu_label = lv.label(menu_btn)
-        menu_label.set_text("Menu")
+        menu_label.set_text(lv.SYMBOL.SETTINGS + " Menu")
         menu_label.set_style_text_font(lv.font_montserrat_12, 0)
         menu_label.center()
-
-        # New game button (quick access)
-        new_btn = lv.button(self.screen)
-        new_btn.set_size(75, 30)
-        new_btn.set_pos(right_panel_x, 140)
-        new_btn.add_event_cb(self.on_new_game, lv.EVENT.CLICKED, None)
-        new_label = lv.label(new_btn)
-        new_label.set_text("New")
-        new_label.set_style_text_font(lv.font_montserrat_12, 0)
-        new_label.center()
+        self._add_focus_style(menu_btn)
 
         # Reset button (quick access)
         reset_btn = lv.button(self.screen)
-        reset_btn.set_size(75, 30)
-        reset_btn.set_pos(right_panel_x, 180)
+        reset_btn.set_size(75, 35)
+        reset_btn.set_pos(right_panel_x, 145)
         reset_btn.add_event_cb(self.on_reset, lv.EVENT.CLICKED, None)
         reset_label = lv.label(reset_btn)
-        reset_label.set_text("Reset")
+        reset_label.set_text(lv.SYMBOL.REFRESH + " Reset")
         reset_label.set_style_text_font(lv.font_montserrat_12, 0)
         reset_label.center()
+        self._add_focus_style(reset_btn)
+
+        # New game button (quick access)
+        new_btn = lv.button(self.screen)
+        new_btn.set_size(75, 35)
+        new_btn.set_pos(right_panel_x, 190)
+        new_btn.add_event_cb(self.on_new_game, lv.EVENT.CLICKED, None)
+        new_label = lv.label(new_btn)
+        new_label.set_text(lv.SYMBOL.PLUS + " New")
+        new_label.set_style_text_font(lv.font_montserrat_12, 0)
+        new_label.center()
+        self._add_focus_style(new_btn)
 
         # Win message (hidden initially)
         self.win_label = lv.label(self.screen)
@@ -270,6 +292,9 @@ class QuasiBoats(Activity):
 
     def show_menu(self, event):
         """Show menu popup"""
+        if self.menu_modal:
+            return
+
         # Create modal background
         self.menu_modal = lv.obj(lv.layer_top())
         self.menu_modal.set_size(self.SCREEN_WIDTH, self.SCREEN_HEIGHT)
@@ -280,67 +305,88 @@ class QuasiBoats(Activity):
 
         # Create menu container
         menu = lv.obj(self.menu_modal)
-        menu.set_size(180, 200)
+        menu.set_size(200, 230)
         menu.set_style_bg_color(lv.color_hex(0x34495E), 0)
         menu.set_style_border_color(lv.color_hex(0x2C3E50), 0)
         menu.set_style_border_width(3, 0)
         menu.set_style_radius(10, 0)
+        menu.set_style_pad_all(15, 0)
+        menu.set_style_pad_row(10, 0) # Gap between items
+        menu.set_flex_flow(lv.FLEX_FLOW.COLUMN)
+        menu.set_flex_align(lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER)
         menu.center()
+
+        # Create a focus group for menu buttons
+        focusgroup = lv.group_get_default()
 
         # Title
         title = lv.label(menu)
         title.set_text("Menu")
         title.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
         title.set_style_text_font(lv.font_montserrat_16, 0)
-        title.align(lv.ALIGN.TOP_MID, 0, 10)
 
         # Grid size selector
         size_label = lv.label(menu)
         size_label.set_text(f"Grid: {self.grid_size}x{self.grid_size}")
         size_label.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
         size_label.set_style_text_font(lv.font_montserrat_12, 0)
-        size_label.align(lv.ALIGN.TOP_MID, 0, 40)
 
-        # Size buttons
-        size_minus_btn = lv.button(menu)
-        size_minus_btn.set_size(35, 30)
-        size_minus_btn.align(lv.ALIGN.TOP_LEFT, 30, 65)
+        # Size buttons container
+        size_container = lv.obj(menu)
+        size_container.set_size(lv.pct(100), 40)
+        size_container.set_style_bg_opa(0, 0)
+        size_container.set_flex_flow(lv.FLEX_FLOW.ROW)
+        size_container.set_flex_align(lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER)
+        size_container.set_style_pad_column(10, 0)
+
+        size_minus_btn = lv.button(size_container)
+        size_minus_btn.set_size(45, 30)
         size_minus_btn.add_event_cb(
             lambda e: self.change_size(-1, size_label), lv.EVENT.CLICKED, None
         )
         minus_label = lv.label(size_minus_btn)
         minus_label.set_text("-")
         minus_label.center()
+        self._add_focus_style(size_minus_btn)
+        if focusgroup:
+            focusgroup.add_obj(size_minus_btn)
+            focusgroup.focus_obj(size_minus_btn)
 
-        size_plus_btn = lv.button(menu)
-        size_plus_btn.set_size(35, 30)
-        size_plus_btn.align(lv.ALIGN.TOP_RIGHT, -30, 65)
+        size_plus_btn = lv.button(size_container)
+        size_plus_btn.set_size(45, 30)
         size_plus_btn.add_event_cb(
             lambda e: self.change_size(1, size_label), lv.EVENT.CLICKED, None
         )
         plus_label = lv.label(size_plus_btn)
         plus_label.set_text("+")
         plus_label.center()
+        self._add_focus_style(size_plus_btn)
+        if focusgroup:
+            focusgroup.add_obj(size_plus_btn)
 
         # New game button
         new_btn = lv.button(menu)
-        new_btn.set_size(120, 30)
-        new_btn.align(lv.ALIGN.TOP_MID, 0, 110)
+        new_btn.set_size(lv.pct(100), 35)
         new_btn.add_event_cb(
             lambda e: (self.on_new_game(e), self.close_menu()), lv.EVENT.CLICKED, None
         )
         new_label = lv.label(new_btn)
-        new_label.set_text("New Game")
+        new_label.set_text(lv.SYMBOL.PLUS + " New Game")
         new_label.center()
+        self._add_focus_style(new_btn)
+        if focusgroup:
+            focusgroup.add_obj(new_btn)
 
         # Close button
         close_btn = lv.button(menu)
-        close_btn.set_size(120, 30)
-        close_btn.align(lv.ALIGN.BOTTOM_MID, 0, -10)
+        close_btn.set_size(lv.pct(100), 35)
         close_btn.add_event_cb(lambda e: self.close_menu(), lv.EVENT.CLICKED, None)
         close_label = lv.label(close_btn)
         close_label.set_text("Close")
         close_label.center()
+        self._add_focus_style(close_btn)
+        if focusgroup:
+            focusgroup.add_obj(close_btn)
 
     def change_size(self, delta, label):
         """Change grid size from menu"""
@@ -370,7 +416,7 @@ class QuasiBoats(Activity):
             self.menu_modal = None
 
     def new_game(self, seed=None):
-        """Generate a new random puzzle"""
+        """Generate a new random puzzle and ensure it's solvable"""
         if seed is None:
             seed = random.randint(1, 999999)
 
@@ -379,13 +425,60 @@ class QuasiBoats(Activity):
 
         random.seed(seed)
 
-        # Clear existing boats
-        for boat in self.boats:
-            if boat.img:
-                boat.img.delete()
-        self.boats = []
-        self.selected_boat = None
-        self.dragging_boat = None
+        # Generate puzzle with solvability check
+        max_gen_attempts = 5
+        for gen_attempt in range(max_gen_attempts):
+            # Clear existing boats
+            for boat in self.boats:
+                if boat.img:
+                    boat.img.delete()
+            self.boats = []
+            self.selected_boat = None
+            self.dragging_boat = None
+
+            # Generate puzzle
+            self.exit_row = self.grid_size // 2
+
+            # Create player boat
+            player_col = random.randint(0, max(0, self.grid_size - 3))
+            self.player_boat = Boat(self.exit_row, player_col, 2, True, True, "red")
+            self.boats.append(self.player_boat)
+
+            # Generate obstacle yachts
+            num_obstacles = min(self.grid_size + 1, 10)
+            colors = ["white", "blue", "yellow", "green", "pink"]
+
+            attempts = 0
+            max_attempts = 200
+            while len(self.boats) < num_obstacles and attempts < max_attempts:
+                attempts += 1
+                length = random.choice([2, 3, 3])
+                is_horizontal = random.choice([True, False])
+                color = random.choice(colors)
+
+                if is_horizontal:
+                    col = random.randint(0, self.grid_size - length)
+                    row = random.randint(0, self.grid_size - 1)
+                else:
+                    col = random.randint(0, self.grid_size - 1)
+                    row = random.randint(0, self.grid_size - length)
+
+                new_boat = Boat(row, col, length, is_horizontal, False, color)
+                new_cells = set(new_boat.get_cells())
+                overlaps = False
+                for existing in self.boats:
+                    if new_cells & set(existing.get_cells()):
+                        overlaps = True
+                        break
+                if not overlaps:
+                    self.boats.append(new_boat)
+            
+            # Check solvability
+            if self.is_solvable(self.boats, self.grid_size, self.exit_row):
+                break
+            # If not solvable and it was the last attempt, we keep it anyway but log it
+            if gen_attempt == max_gen_attempts - 1:
+                print("Warning: Could not guarantee solvability after 5 attempts")
 
         # Reset counters
         self.move_count = 0
@@ -393,49 +486,6 @@ class QuasiBoats(Activity):
         self.game_won = False
         self.moves_label.set_text("Moves\n0")
         self.win_label.add_flag(lv.obj.FLAG.HIDDEN)
-
-        # Generate puzzle
-        self.exit_row = self.grid_size // 2
-
-        # Create player boat (always horizontal, on exit row, length 2)
-        player_col = random.randint(0, self.grid_size - 4)
-        self.player_boat = Boat(self.exit_row, player_col, 2, True, True, "red")
-        self.boats.append(self.player_boat)
-
-        # Generate obstacle yachts
-        num_obstacles = min(self.grid_size + 2, 12)
-        colors = ["white", "blue", "yellow", "green", "pink"]
-
-        attempts = 0
-        while len(self.boats) < num_obstacles and attempts < 100:
-            attempts += 1
-
-            length = random.choice([2, 3, 3, 4])
-            is_horizontal = random.choice([True, False])
-            color = random.choice(colors)
-
-            if is_horizontal:
-                max_col = self.grid_size - length
-                max_row = self.grid_size - 1
-                col = random.randint(0, max_col)
-                row = random.randint(0, max_row)
-            else:
-                max_col = self.grid_size - 1
-                max_row = self.grid_size - length
-                col = random.randint(0, max_col)
-                row = random.randint(0, max_row)
-
-            new_boat = Boat(row, col, length, is_horizontal, False, color)
-
-            new_cells = set(new_boat.get_cells())
-            overlaps = False
-            for existing in self.boats:
-                if new_cells & set(existing.get_cells()):
-                    overlaps = True
-                    break
-
-            if not overlaps:
-                self.boats.append(new_boat)
 
         # Create images for boats
         self.create_boat_images()
@@ -459,7 +509,10 @@ class QuasiBoats(Activity):
             img = lv.image(self.grid_container)
             img.set_src(src)
 
-            # Scale image to fit cell size
+            # Scale image to fit cell size (assets are 40px)
+            scale = (self.cell_size * 256) // 40
+            img.set_scale(scale)
+
             if boat.is_horizontal:
                 img.set_size(boat.length * self.cell_size, self.cell_size)
             else:
@@ -542,8 +595,19 @@ class QuasiBoats(Activity):
         else:
             new_col = boat.col  # Lock column
 
-        # Check if valid move
+        # Clamp to grid bounds
+        new_row = max(0, min(new_row, self.grid_size - 1))
+        if boat.is_horizontal:
+            new_col = max(0, min(new_col, self.grid_size - boat.length))
+        else:
+            new_col = max(0, min(new_col, self.grid_size - 1))
+
+        # Check if valid move (prevents passing through other boats)
         if boat.can_move_to(new_row, new_col, self.grid_size, self.boats):
+            # Update boat position in model
+            boat.row = new_row
+            boat.col = new_col
+            
             # Update visual position
             x = new_col * self.cell_size
             y = new_row * self.cell_size
@@ -675,14 +739,15 @@ class QuasiBoats(Activity):
         self.boats = []
 
         # Recreate grid container with new cell size
-        grid_pixel_size = self.grid_size * self.cell_size
+        grid_pixel_size = self.grid_size * self.cell_size + 4
 
         self.grid_container = lv.obj(self.screen)
         self.grid_container.set_size(grid_pixel_size, grid_pixel_size)
-        self.grid_container.set_pos(self.grid_offset_x, self.grid_offset_y)
+        self.grid_container.set_pos(self.grid_offset_x - 2, self.grid_offset_y - 2)
         self.grid_container.set_style_bg_opa(0, 0)
         self.grid_container.set_style_border_width(2, 0)
         self.grid_container.set_style_border_color(lv.color_hex(0x2C3E50), 0)
+        self.grid_container.set_style_pad_all(2, 0)
         self.grid_container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
         self.grid_container.remove_flag(lv.obj.FLAG.SCROLLABLE)
 
@@ -718,9 +783,17 @@ class QuasiBoats(Activity):
         """Handle keyboard input"""
         key = event.get_key()
 
+        # Don't process game keys if menu is open
+        if self.menu_modal:
+            return
+
         # Enter/A key locks movement mode
         if key == lv.KEY.ENTER or key == ord("A") or key == ord("a"):
             self.move_locked = True
+            group = lv.group_get_default()
+            if group:
+                group.set_editing(True)
+            return
 
         # Arrow keys move boat when locked
         if key == lv.KEY.UP:
@@ -750,7 +823,73 @@ class QuasiBoats(Activity):
         indev = lv.indev_active()
         if indev and indev.get_type() == lv.INDEV_TYPE.KEYPAD:
             if not indev.get_key():
-                self.move_locked = False
+                if self.move_locked:
+                    self.move_locked = False
+                    group = lv.group_get_default()
+                    if group:
+                        group.set_editing(False)
+
+    def _add_focus_style(self, obj):
+        """Apply a standard focus highlight to buttons"""
+        obj.set_style_outline_width(2, lv.STATE.FOCUS_KEY)
+        obj.set_style_outline_color(lv.color_hex(0xFFFFFF), lv.STATE.FOCUS_KEY)
+        obj.set_style_outline_opa(255, lv.STATE.FOCUS_KEY)
+
+    def is_solvable(self, boats, grid_size, exit_row):
+        """Simple BFS to check if the player boat can reach the exit"""
+        player_boat = boats[0]
+        target_col = grid_size - player_boat.length
+        start_state = tuple(b.col if b.is_horizontal else b.row for b in boats)
+        queue = [start_state]
+        visited = {start_state}
+        max_states = 500
+        head = 0
+        while head < len(queue) and len(visited) < max_states:
+            state = queue[head]
+            head += 1
+            if state[0] >= target_col:
+                return True
+            for i in range(len(boats)):
+                curr_val = state[i]
+                for step in [-1, 1]:
+                    new_val = curr_val + step
+                    if not self._check_collision_static(i, new_val, state, boats, grid_size):
+                        new_state_list = list(state)
+                        new_state_list[i] = new_val
+                        new_state = tuple(new_state_list)
+                        if new_state not in visited:
+                            visited.add(new_state)
+                            queue.append(new_state)
+        return False
+
+    def _check_collision_static(self, boat_idx, new_val, state, boats, grid_size):
+        """Check collision for BFS solver (static state)"""
+        b = boats[boat_idx]
+        length = b.length
+        is_h = b.is_horizontal
+        r1 = b.row if is_h else new_val
+        c1 = new_val if is_h else b.col
+        if new_val < 0 or new_val + length > grid_size:
+            return True
+        for j in range(len(boats)):
+            if boat_idx == j: continue
+            bj = boats[j]
+            vj = state[j]
+            is_hj = bj.is_horizontal
+            r2 = bj.row if is_hj else vj
+            c2 = vj if is_hj else bj.col
+            l2 = bj.length
+            if is_h == is_hj:
+                if (r1 == r2 if is_h else c1 == c2):
+                    start1, start2 = (c1 if is_h else r1), (c2 if is_hj else r2)
+                    if start1 < start2 + l2 and start2 < start1 + length:
+                        return True
+            else:
+                rh, ch, lh = (r1 if is_h else r2), (c1 if is_h else c2), (length if is_h else l2)
+                rv, cv, lv = (r2 if not is_hj else r1), (c2 if not is_hj else c1), (l2 if not is_hj else length)
+                if rv <= rh < rv + lv and ch <= cv < ch + lh:
+                    return True
+        return False
 
     def onResume(self, screen):
         """Activity goes foreground"""
