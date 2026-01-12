@@ -538,11 +538,22 @@ class QuasiBoats(Activity):
             img.add_event_cb(
                 lambda e, b=boat: self.on_boat_defocused(e, b), lv.EVENT.DEFOCUSED, None
             )
+            img.add_event_cb(
+                lambda e, b=boat: self.on_boat_key(e, b), lv.EVENT.KEY, None
+            ) # Add key event handler to boat
 
             if focusgroup:
                 focusgroup.add_obj(img)
 
             boat.img = img
+
+    def on_boat_key(self, event, boat):
+        """Handle key events for individual boats"""
+        key = event.get_key()
+        if key == lv.KEY.ENTER or key == ord("A") or key == ord("a"):
+            self.move_locked = not self.move_locked
+            self._update_boat_drag_visuals(boat)
+            return # Stop event from propagating to screen
 
     def on_boat_focused(self, event, boat):
         """Highlight boat when focused with keyboard"""
@@ -572,10 +583,12 @@ class QuasiBoats(Activity):
         # Visual feedback
         boat.img.set_style_outline_width(3, 0)
         boat.img.set_style_outline_color(lv.color_hex(0xF39C12), 0)
+        self._update_boat_drag_visuals(boat) # Show dots on press
 
     def on_boat_pressing(self, event, boat):
         """Handle boat dragging (touch)"""
-        if not self.dragging_boat or self.game_won:
+        # Only process if actually dragging with touch, not just holding Enter
+        if not self.dragging_boat or self.game_won or self.move_locked:
             return
 
         # Get touch position relative to grid
@@ -613,6 +626,7 @@ class QuasiBoats(Activity):
             x = new_col * self.cell_size
             y = new_row * self.cell_size
             boat.img.set_pos(x, y)
+            self._update_boat_drag_visuals(boat) # Update dots during dragging
 
     def on_boat_released(self, event, boat):
         """Handle boat release - snap to grid (touch)"""
@@ -665,6 +679,7 @@ class QuasiBoats(Activity):
         self._update_boat_drag_visuals(boat)
 
         self.dragging_boat = None
+        self._update_boat_drag_visuals(boat) # Clear dots on release
 
     def move_selected_boat(self, direction):
         """Move selected boat with keyboard (only when Enter/A is held)"""
@@ -782,19 +797,8 @@ class QuasiBoats(Activity):
     def on_key(self, event):
         """Handle keyboard input"""
         key = event.get_key()
-
         # Don't process game keys if menu is open
         if self.menu_modal:
-            return
-
-        # Enter/A key toggles movement mode
-        if key == lv.KEY.ENTER or key == ord("A") or key == ord("a"):
-            self.move_locked = not self.move_locked
-            group = lv.group_get_default()
-            if group:
-                group.set_editing(self.move_locked)
-            if self.selected_boat:
-                self._update_boat_drag_visuals(self.selected_boat)
             return
 
         # Arrow keys move boat when locked
@@ -822,15 +826,14 @@ class QuasiBoats(Activity):
             self.time_label.set_text(f"{minutes}:{seconds:02d}")
 
         # Check if Enter/A key is released
+        # Check if Enter/A key is released (only if not handled by boat directly)
+        # This is a fallback for when the boat doesn't consume the event
         indev = lv.indev_active()
         if indev and indev.get_type() == lv.INDEV_TYPE.KEYPAD:
-            if not indev.get_key():
+            if not indev.get_key(): # No key is currently pressed
                 if self.move_locked:
                     self.move_locked = False
-                    group = lv.group_get_default()
-                    if group:
-                        group.set_editing(False)
-                        if self.selected_boat:
+                    if self.selected_boat:
                             self._update_boat_drag_visuals(self.selected_boat)
 
     def _update_boat_drag_visuals(self, boat):
@@ -860,7 +863,7 @@ class QuasiBoats(Activity):
             if boat.col > 0 and boat.can_move_to(boat.row, boat.col - 1, self.grid_size, self.boats):
                 dot = lv.obj(self.grid_container)
                 dot.set_size(dot_size, dot_size)
-                dot.set_style_radius(lv.RADIUS.CIRCLE, 0)
+                dot.set_style_radius(lv.RADIUS_CIRCLE, 0)
                 dot.set_style_bg_color(dot_color, 0)
                 dot.align_to(boat.img, lv.ALIGN.LEFT_MID, -dot_size // 2, 0)
                 self.drag_dots.append(dot)
@@ -869,7 +872,7 @@ class QuasiBoats(Activity):
             if boat.col + boat.length < self.grid_size and boat.can_move_to(boat.row, boat.col + 1, self.grid_size, self.boats):
                 dot = lv.obj(self.grid_container)
                 dot.set_size(dot_size, dot_size)
-                dot.set_style_radius(lv.RADIUS.CIRCLE, 0)
+                dot.set_style_radius(lv.RADIUS_CIRCLE, 0)
                 dot.set_style_bg_color(dot_color, 0)
                 dot.align_to(boat.img, lv.ALIGN.RIGHT_MID, dot_size // 2, 0)
                 self.drag_dots.append(dot)
@@ -878,7 +881,7 @@ class QuasiBoats(Activity):
             if boat.row > 0 and boat.can_move_to(boat.row - 1, boat.col, self.grid_size, self.boats):
                 dot = lv.obj(self.grid_container)
                 dot.set_size(dot_size, dot_size)
-                dot.set_style_radius(lv.RADIUS.CIRCLE, 0)
+                dot.set_style_radius(lv.RADIUS_CIRCLE, 0)
                 dot.set_style_bg_color(dot_color, 0)
                 dot.align_to(boat.img, lv.ALIGN.TOP_MID, 0, -dot_size // 2)
                 self.drag_dots.append(dot)
@@ -887,7 +890,7 @@ class QuasiBoats(Activity):
             if boat.row + boat.length < self.grid_size and boat.can_move_to(boat.row + 1, boat.col, self.grid_size, self.boats):
                 dot = lv.obj(self.grid_container)
                 dot.set_size(dot_size, dot_size)
-                dot.set_style_radius(lv.RADIUS.CIRCLE, 0)
+                dot.set_style_radius(lv.RADIUS_CIRCLE, 0)
                 dot.set_style_bg_color(dot_color, 0)
                 dot.align_to(boat.img, lv.ALIGN.BOTTOM_MID, 0, dot_size // 2)
                 self.drag_dots.append(dot)
