@@ -1,2 +1,6 @@
-- menu button clicking error
-- dragging with arrows just expands selection, no moving
+- [] menu popup: focus is able to exit and access stuff underneath
+- [] dragging with arrows is not working. behaviour should be:
+    - when you press down with touch, or navigate to a boat with arrow keys focus (working):
+      - [] the selection border turns red color as long as you touch press down, or it toggles red if you press enter button
+      - while touch press down, or in enter key induced toggle it shows red dots where you can drag to
+      - when you let go touch, or press the enter key untoggling, the red border dissapears or is toggled off.
