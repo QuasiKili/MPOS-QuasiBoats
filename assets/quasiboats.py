@@ -231,7 +231,7 @@ class QuasiBoats(Activity):
         self.seed_label = lv.label(self.screen)
         self.seed_label.set_text("#0")
         self.seed_label.set_style_text_color(lv.color_hex(0xF39C12), 0)
-        self.seed_label.set_style_text_font(lv.font_montserrat_12, 0)
+        
         self.seed_label.set_pos(right_panel_x, 10)
 
         # Timer

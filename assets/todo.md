@@ -1,6 +1,5 @@
-- [] menu popup: focus is able to exit and access stuff underneath
+    - [] menu + and minus are in row with unnecessary border 
 - [] dragging with arrows is not working. behaviour should be:
-    - when you press down with touch, or navigate to a boat with arrow keys focus (working):
-      - [] the selection border turns red color as long as you touch press down, or it toggles red if you press enter button
-      - while touch press down, or in enter key induced toggle it shows red dots where you can drag to
-      - when you let go touch, or press the enter key untoggling, the red border dissapears or is toggled off.
+    - [x] when you press down with touch, or a boat is selected adn you press enter button:
+      - [x] the selection border turn red color, and dots are shown where you can drag to
+    - [x] when you let go touch or press the enter again the red border dissapear or is toggled off.
