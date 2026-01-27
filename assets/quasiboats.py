@@ -1,10 +1,8 @@
 import time
 import random
 
-from mpos.apps import Activity
+from mpos import Activity, InputManager, SharedPreferences
 import mpos.ui
-import mpos.config
-from mpos.ui.focus_direction import emulate_focus_obj
 
 try:
     import lvgl as lv  # pyright: ignore[reportMissingModuleSource]
@@ -123,6 +121,7 @@ class QuasiBoats(Activity):
     current_seed = 0
     move_locked = False  # For keyboard control with Enter held
     drag_dots = [] # Store dot objects for selected boat
+    update_timer = None # Reference to LVGL timer for frame updates
 
     # UI Elements
     screen = None
@@ -147,7 +146,7 @@ class QuasiBoats(Activity):
         self.GRID_PIXEL_SIZE = self.SCREEN_HEIGHT - 10
 
         # Load preferences
-        prefs = mpos.config.SharedPreferences("com.quasikili.quasiboats")
+        prefs = SharedPreferences("com.quasikili.quasiboats")
         self.grid_size = prefs.get_int("grid_size", self.DEFAULT_GRID_SIZE)
 
         # Create screen
@@ -349,7 +348,7 @@ class QuasiBoats(Activity):
         self._add_focus_style(size_minus_btn)
         if focusgroup:
             focusgroup.add_obj(size_minus_btn)
-            emulate_focus_obj(focusgroup, size_minus_btn)
+            InputManager.emulate_focus_obj(focusgroup, size_minus_btn)
 
         size_plus_btn = lv.button(size_container)
         size_plus_btn.set_size(40, 30) # Slightly smaller button
@@ -396,7 +395,7 @@ class QuasiBoats(Activity):
             label.align(lv.ALIGN.TOP_MID, 0, 40)
 
             # Save preference
-            editor = mpos.config.SharedPreferences("com.quasikili.quasiboats").edit()
+            editor = SharedPreferences("com.quasikili.quasiboats").edit()
             editor.put_int("grid_size", self.grid_size)
             editor.commit()
 
@@ -567,19 +566,19 @@ class QuasiBoats(Activity):
         if self.move_locked:
             if key == lv.KEY.UP:
                 self.move_selected_boat("up")
-                emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
+                InputManager.emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
                 event.stop_bubbling()
             elif key == lv.KEY.DOWN:
                 self.move_selected_boat("down")
-                emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
+                InputManager.emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
                 event.stop_bubbling()
             elif key == lv.KEY.LEFT:
                 self.move_selected_boat("left")
-                emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
+                InputManager.emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
                 event.stop_bubbling()
             elif key == lv.KEY.RIGHT:
                 self.move_selected_boat("right")
-                emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
+                InputManager.emulate_focus_obj(lv.group_get_default(), boat.img) # Re-focus the boat after moving
                 event.stop_bubbling()
         # If not move_locked, let the event bubble up for focus navigation (no else needed)
 
@@ -845,7 +844,7 @@ class QuasiBoats(Activity):
         elif key == ord("M") or key == ord("m"):
             self.show_menu(event)
 
-    def update_frame(self, a, b):
+    def update_frame(self, timer):
         """Main game loop - update timer and check key state"""
         if not self.game_won:
             elapsed = time.ticks_diff(time.ticks_ms(), self.start_time) // 1000
@@ -994,8 +993,11 @@ class QuasiBoats(Activity):
 
     def onResume(self, screen):
         """Activity goes foreground"""
-        mpos.ui.task_handler.add_event_cb(self.update_frame, 1)
+        self.update_timer = lv.timer_create(self.update_frame, 16, None) # max 60 fps = 16ms/frame
 
     def onPause(self, screen):
         """Activity goes background"""
-        mpos.ui.task_handler.remove_event_cb(self.update_frame)
+        # Delete the timer
+        if self.update_timer:
+            self.update_timer.delete()
+            self.update_timer = None
