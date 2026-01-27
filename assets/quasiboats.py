@@ -205,22 +205,43 @@ class QuasiBoats(Activity):
         self.grid_container.remove_flag(lv.obj.FLAG.SCROLLABLE)
 
         # Create exit indicator (wooden dock on right edge, middle row)
-        self.exit_row = self.grid_size // 2
-        exit_marker = lv.obj(self.grid_container)
-        exit_marker.set_size(self.cell_size, self.cell_size)
-        exit_marker.set_pos(
-            (self.grid_size - 1) * self.cell_size, self.exit_row * self.cell_size
-        )
-        exit_marker.set_style_bg_color(lv.color_hex(0x8B4513), 0)  # Brown dock
-        exit_marker.set_style_border_color(lv.color_hex(0x654321), 0)
-        exit_marker.set_style_border_width(2, 0)
-        exit_marker.set_style_radius(0, 0)
+        # self.exit_row = self.grid_size // 2
+        # exit_marker = lv.obj(self.grid_container)
+        # exit_marker.set_size(self.cell_size, self.cell_size)
+        # exit_marker.set_pos(
+        #     (self.grid_size - 1) * self.cell_size, self.exit_row * self.cell_size
+        # )
+        # # exit_marker.set_style_bg_color(lv.color_hex(0x8B4513), 0)  # Brown dock
+        # # exit_marker.set_style_border_color(lv.color_hex(0x654321), 0)
+        # # exit_marker.set_style_border_width(2, 0)
+        # exit_marker.set_style_radius(0, 0)
+        # exit_marker.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
+        # exit_marker.remove_flag(lv.obj.FLAG.SCROLLABLE)
+
 
         # Arrow on exit
-        arrow_label = lv.label(exit_marker)
+        # arrow_label = lv.label(exit_marker)
+        arrow_label = lv.label(self.grid_container)
+        self.exit_row = self.grid_size // 2
+        # arrow_label.set_size(self.cell_size, self.cell_size)
+        arrow_label.set_size(self.cell_size, self.cell_size)
+        arrow_label.set_pos(
+            ((self.grid_size - 1) * self.cell_size) + self.exit_row, (self.exit_row * self.cell_size) + int(self.exit_row*3)
+        )
         arrow_label.set_text(lv.SYMBOL.RIGHT)
         arrow_label.set_style_text_color(lv.color_hex(0xFFD700), 0)
-        arrow_label.center()
+        arrow_label.set_style_size(self.cell_size, self.cell_size, 0)
+        # arrow_label.set_style_bg_color(lv.color_hex(0x8B4513), 0)  # Brown dock
+        # arrow_label.set_style_border_color(lv.color_hex(0x654321), 0)
+        # arrow_label.set_style_border_width(2, 0)
+        # arrow_label.set_style_radius(0, 0)
+        arrow_label.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
+
+        # arrow_label.set_style_bg_color(lv.color_hex(0x00D7FF), 0)
+        arrow_label.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
+        arrow_label.remove_flag(lv.obj.FLAG.SCROLLABLE)
+        # arrow_label.center()
+
 
         # Right panel - Info and controls
         right_panel_content_size = self.grid_size * self.cell_size
