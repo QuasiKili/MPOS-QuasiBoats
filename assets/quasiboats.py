@@ -185,7 +185,7 @@ class QuasiBoats(Activity):
         self.water_bg = lv.obj(self.screen)
         self.water_bg.set_size(lv.pct(100), lv.pct(100))
         self.water_bg.set_pos(0, 0)
-        self.water_bg.set_style_bg_color(lv.color_hex(0x4A90E2), 0)  # Water blue
+        self.water_bg.set_style_bg_color(lv.color_hex(0x2A84E3), 0)  # Water blue
         self.water_bg.set_style_border_width(0, 0)
         self.water_bg.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
         self.water_bg.remove_flag(lv.obj.FLAG.SCROLLABLE)
@@ -277,7 +277,6 @@ class QuasiBoats(Activity):
         new_btn.add_event_cb(self.on_new_game, lv.EVENT.CLICKED, None)
         new_label = lv.label(new_btn)
         new_label.set_text(lv.SYMBOL.PLUS + " New")
-        new_label.set_style_text_font(lv.font_montserrat_12, 0)
         new_label.center()
         self._add_focus_style(new_btn)
 
@@ -438,19 +437,21 @@ class QuasiBoats(Activity):
             self.exit_row = self.grid_size // 2
 
             # Create player boat
-            player_col = random.randint(0, max(0, self.grid_size - 3))
+            player_col = random.randint(0, max(0, self.grid_size - 2)) # Player boat is always length 2
             self.player_boat = Boat(self.exit_row, player_col, 2, True, True, "red")
             self.boats.append(self.player_boat)
 
             # Generate obstacle yachts
             num_obstacles = min(self.grid_size + 1, 10)
-            colors = ["white", "blue", "yellow", "green", "pink"]
+            # Only use white yachts
+            colors = ["white"]
 
             attempts = 0
             max_attempts = 200
             while len(self.boats) < num_obstacles and attempts < max_attempts:
                 attempts += 1
-                length = random.choice([2, 3, 3])
+                # Only use lengths 2 and 3 for yachts
+                length = random.choice([2, 3])
                 is_horizontal = random.choice([True, False])
                 color = random.choice(colors)
 
@@ -498,11 +499,11 @@ class QuasiBoats(Activity):
 
         for boat in self.boats:
             if boat.is_player:
-                orientation = "h" if boat.is_horizontal else "v"
-                src = f"{self.ASSET_PATH}player_{orientation}{boat.length}.png"
+                # Player boat is always length 2, load horizontal asset
+                src = f"{self.ASSET_PATH}player_h2.png"
             else:
-                orientation = "h" if boat.is_horizontal else "v"
-                src = f"{self.ASSET_PATH}yacht_{boat.color}_{orientation}{boat.length}.png"
+                # Yachts are length 2 or 3, and always white, load horizontal asset
+                src = f"{self.ASSET_PATH}yacht_white_h{boat.length}.png"
 
             img = lv.image(self.grid_container)
             img.set_src(src)
@@ -511,14 +512,23 @@ class QuasiBoats(Activity):
             scale = (self.cell_size * 256) // 40
             img.set_scale(scale)
 
-            if boat.is_horizontal:
-                img.set_size(boat.length * self.cell_size, self.cell_size)
-            else:
-                img.set_size(self.cell_size, boat.length * self.cell_size)
-
+            # Set initial position
             x = boat.col * self.cell_size
             y = boat.row * self.cell_size
-            img.set_pos(x, y)
+
+            if boat.is_horizontal:
+                img.set_size(boat.length * self.cell_size, self.cell_size)
+                img.set_pos(x, y)
+            else:
+                # For vertical boats: set the image object's bounding box to vertical dimensions.
+                img.set_size(self.cell_size, boat.length * self.cell_size)
+                # Set the pivot to the center of this new, vertical bounding box.
+                # img.set_pivot(self.cell_size // 2, (boat.length * self.cell_size) // 2)
+                # Rotate the image content by 90 degrees clockwise.
+                img.set_rotation(900) # LVGL uses tenths of a degree
+                # Set the position of the top-left corner of this new, vertical bounding box.
+                img.set_pos(x, y)
+
 
             # Make draggable and focusable
             img.add_flag(lv.obj.FLAG.CLICKABLE)
