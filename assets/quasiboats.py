@@ -102,7 +102,7 @@ class QuasiBoats(Activity):
     GRID_PIXEL_SIZE = 230  # Leave small margin
 
     # UI dimensions
-    RIGHT_PANEL_WIDTH = 85
+    RIGHT_PANEL_WIDTH = 75
 
     # Calculated per grid size
     cell_size = 0
@@ -135,6 +135,9 @@ class QuasiBoats(Activity):
     seed_label = None
     win_label = None
     menu_modal = None
+
+    # colors
+    wood_border_color = 0x654321
 
     def onCreate(self):
         print("Quasi Boats starting...")
@@ -203,32 +206,22 @@ class QuasiBoats(Activity):
         right_panel_content_size = self.grid_size * self.cell_size
         right_panel_x = self.grid_offset_x + right_panel_content_size + 5
 
+        self._create_info_panel_container(right_panel_x)
+
+        self._create_info_panel_labels(self.info_panel_container)
+        self._create_win_label(self.grid_container)
+
         # Seed display
         self.seed_label = lv.label(self.screen)
         self.seed_label.set_text("#0")
         self.seed_label.set_style_text_color(lv.color_hex(0xF39C12), 0)
-        
-        self.seed_label.set_pos(right_panel_x, 10)
-
-        # Timer
-        self.time_label = lv.label(self.screen)
-        self.time_label.set_text("0:00")
-        self.time_label.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
-        self.time_label.set_style_text_font(lv.font_montserrat_14, 0)
-        self.time_label.set_pos(right_panel_x, 35)
-
-        # Moves counter
-        self.moves_label = lv.label(self.screen)
-        self.moves_label.set_text("Moves\n0")
-        self.moves_label.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
-        self.moves_label.set_style_text_font(lv.font_montserrat_12, 0)
-        self.moves_label.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
-        self.moves_label.set_pos(right_panel_x, 60)
+        # self.seed_label.set_pos(right_panel_x, 110) # Adjusted position
+        self.seed_label.set_pos(right_panel_x, 80) # Adjusted position
 
         # Menu button
         menu_btn = lv.button(self.screen)
         menu_btn.set_size(75, 35)
-        menu_btn.set_pos(right_panel_x, 100)
+        menu_btn.set_pos(right_panel_x, 105) # Adjusted position
         menu_btn.add_event_cb(self.show_menu, lv.EVENT.CLICKED, None)
         menu_label = lv.label(menu_btn)
         menu_label.set_text(lv.SYMBOL.SETTINGS + " Menu")
@@ -239,7 +232,7 @@ class QuasiBoats(Activity):
         # Reset button (quick access)
         reset_btn = lv.button(self.screen)
         reset_btn.set_size(75, 35)
-        reset_btn.set_pos(right_panel_x, 145)
+        reset_btn.set_pos(right_panel_x, 150) # Adjusted position
         reset_btn.add_event_cb(self.on_reset, lv.EVENT.CLICKED, None)
         reset_label = lv.label(reset_btn)
         reset_label.set_text(lv.SYMBOL.REFRESH + " Reset")
@@ -250,22 +243,62 @@ class QuasiBoats(Activity):
         # New game button (quick access)
         new_btn = lv.button(self.screen)
         new_btn.set_size(75, 35)
-        new_btn.set_pos(right_panel_x, 190)
+        new_btn.set_pos(right_panel_x, 195) # Adjusted position
         new_btn.add_event_cb(self.on_new_game, lv.EVENT.CLICKED, None)
         new_label = lv.label(new_btn)
         new_label.set_text(lv.SYMBOL.PLUS + " New")
         new_label.center()
         self._add_focus_style(new_btn)
 
+    def _create_info_panel_labels(self, parent):
+        # Timer
+        self.time_label = lv.label(parent)
+        self.time_label.set_text("0:00")
+        self.time_label.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
+        self.time_label.set_style_text_font(lv.font_montserrat_14, 0)
+        self.time_label.align(lv.ALIGN.TOP_MID, 0, 0)
+
+        # Moves counter
+        self.moves_label = lv.label(parent)
+        self.moves_label.set_text("Moves\n0")
+        self.moves_label.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
+        self.moves_label.set_style_text_font(lv.font_montserrat_12, 0)
+        self.moves_label.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
+        self.moves_label.align(lv.ALIGN.TOP_MID, 0, 25)
+
+    def _create_win_label(self, grid_container):
+        # Create a container for the win label with a background
+        self.win_panel_container = lv.obj(self.screen)
+        self.win_panel_container.set_size(200, 140) # Adjust size as needed
+        self.win_panel_container.align_to(grid_container, lv.ALIGN.CENTER, 0, 0) # Centered on grid container
+        self.win_panel_container.set_style_bg_color(lv.color_hex(0x8B4513), 0)  # Wooden plank color
+        self.win_panel_container.set_style_radius(10, 0)
+        self.win_panel_container.set_style_pad_all(10, 0)
+        self.win_panel_container.set_flex_flow(lv.FLEX_FLOW.COLUMN)
+        self.win_panel_container.set_flex_align(lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER)
+        self.win_panel_container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
+        self.win_panel_container.remove_flag(lv.obj.FLAG.SCROLLABLE)
+        self.win_panel_container.add_flag(lv.obj.FLAG.HIDDEN) # Hidden initially
+
         # Win message (hidden initially)
-        
-        self.win_label = lv.label(self.screen)
+        self.win_label = lv.label(self.win_panel_container)
         self.win_label.set_text("You Win!")
         self.win_label.set_style_text_font(lv.font_montserrat_28_compressed, 0)
-        self.win_label.set_style_text_color(lv.color_hex(0x2ECC71), 0)
+        self.win_label.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
         self.win_label.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
-        self.win_label.align(lv.ALIGN.CENTER, -40, 0)
-        self.win_label.add_flag(lv.obj.FLAG.HIDDEN)
+        self.win_label.align(lv.ALIGN.CENTER, 0, 0)
+
+    def _create_info_panel_container(self, right_panel_x):
+        self.info_panel_container = lv.obj(self.screen)
+        self.info_panel_container.set_size(self.RIGHT_PANEL_WIDTH, 70) # Adjusted size
+        self.info_panel_container.set_pos(right_panel_x, 5)
+        self.info_panel_container.set_style_bg_color(lv.color_hex(0x8B4513), 0)  # Wooden plank color
+        self.info_panel_container.set_style_radius(5, 0)
+        self.info_panel_container.set_style_pad_all(5, 0)
+        self.info_panel_container.set_flex_flow(lv.FLEX_FLOW.COLUMN)
+        self.info_panel_container.set_flex_align(lv.FLEX_ALIGN.START, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.START)
+        self.info_panel_container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
+        self.info_panel_container.remove_flag(lv.obj.FLAG.SCROLLABLE)
 
     def show_menu(self, event):
         """Show menu popup"""
@@ -313,6 +346,7 @@ class QuasiBoats(Activity):
         size_container.set_flex_align(lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER)
         size_container.set_style_pad_column(5, 0) # Reduced padding
         size_container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF) # Explicitly disable scrollbar
+        size_container.set_style_border_width(0,0)
 
         size_minus_btn = lv.button(size_container)
         size_minus_btn.set_size(40, 30) # Slightly smaller button
@@ -462,7 +496,7 @@ class QuasiBoats(Activity):
         self.start_time = time.ticks_ms()
         self.game_won = False
         self.moves_label.set_text("Moves\n0")
-        self.win_label.add_flag(lv.obj.FLAG.HIDDEN)
+        self.win_panel_container.add_flag(lv.obj.FLAG.HIDDEN)
 
         # Create images for boats
         self.create_boat_images()
@@ -753,7 +787,7 @@ class QuasiBoats(Activity):
         self.win_label.set_text(
             f"You Win!\n{self.move_count} moves\n{minutes}:{seconds:02d}"
         )
-        self.win_label.remove_flag(lv.obj.FLAG.HIDDEN)
+        self.win_panel_container.remove_flag(lv.obj.FLAG.HIDDEN)
 
         print(f"Puzzle solved! Moves: {self.move_count}, Time: {elapsed}s")
 
@@ -770,8 +804,10 @@ class QuasiBoats(Activity):
         # Delete old containers
         if self.grid_container:
             self.grid_container.delete()
-        if self.win_label:
-            self.win_label.delete()
+        if self.win_panel_container:
+            self.win_panel_container.delete()
+        if self.info_panel_container:
+            self.info_panel_container.delete()
 
         # Clear boat list
         self.boats = []
@@ -783,13 +819,14 @@ class QuasiBoats(Activity):
         self._create_grid_container(grid_pixel_size)
         self._create_exit_marker()
 
-        # Recreate win label
-        self.win_label = lv.label(self.screen)
-        self.win_label.set_style_text_font(lv.font_montserrat_28_compressed, 0)
-        self.win_label.set_style_text_color(lv.color_hex(0x2ECC71), 0)
-        self.win_label.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
-        self.win_label.align(lv.ALIGN.CENTER, -40, 0)
-        self.win_label.add_flag(lv.obj.FLAG.HIDDEN)
+        # Recreate info panel container and labels
+        right_panel_content_size = self.grid_size * self.cell_size
+        right_panel_x = self.grid_offset_x + right_panel_content_size + 5
+
+        self._create_info_panel_container(right_panel_x)
+
+        self._create_info_panel_labels(self.info_panel_container)
+        self._create_win_label(self.grid_container)
 
         # Start new game
         self.new_game()
