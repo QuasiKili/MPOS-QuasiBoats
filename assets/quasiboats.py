@@ -122,6 +122,8 @@ class QuasiBoats(Activity):
     move_locked = False  # For keyboard control with Enter held
     drag_dots = [] # Store dot objects for selected boat
     update_timer = None # Reference to LVGL timer for frame updates
+    _is_generating_puzzle = False # New global variable to track generation state
+    _puzzle_generation_timer = None # Reference to the puzzle generation timer
 
     # Waves
     waves = []
@@ -469,72 +471,10 @@ class QuasiBoats(Activity):
             self.menu_modal = None
 
     def new_game(self, seed=None):
-        """Generate a new random puzzle and ensure it's solvable"""
-        if seed is None:
-            seed = random.randint(1, 999999)
-
-        self.current_seed = seed
-        self.seed_label.set_text(f"#{seed}")
-
-        random.seed(seed)
-
-        # Generate puzzle with solvability check
-        max_gen_attempts = 5
-        for gen_attempt in range(max_gen_attempts):
-            # Clear existing boats
-            for boat in self.boats:
-                if boat.img:
-                    boat.img.delete()
-            self.boats = []
-            self.selected_boat = None
-            self.dragging_boat = None
-
-            # Generate puzzle
-            self.exit_row = self.grid_size // 2
-
-            # Create player boat
-            player_col = random.randint(0, max(0, self.grid_size - 2)) # Player boat is always length 2
-            self.player_boat = Boat(self.exit_row, player_col, 2, True, True, "red")
-            self.boats.append(self.player_boat)
-
-            # Generate obstacle yachts
-            num_obstacles = min(self.grid_size + 1, 10)
-            # Only use white yachts
-            colors = ["white"]
-
-            attempts = 0
-            max_attempts = 200
-            while len(self.boats) < num_obstacles and attempts < max_attempts:
-                attempts += 1
-                # Only use lengths 2 and 3 for yachts
-                length = random.choice([2, 3])
-                is_horizontal = random.choice([True, False])
-                color = random.choice(colors)
-
-                if is_horizontal:
-                    col = random.randint(0, self.grid_size - length)
-                    row = random.randint(0, self.grid_size - 1)
-                else:
-                    col = random.randint(0, self.grid_size - 1)
-                    row = random.randint(0, self.grid_size - length)
-
-                new_boat = Boat(row, col, length, is_horizontal, False, color)
-                new_cells = set(new_boat.get_cells())
-                overlaps = False
-                for existing in self.boats:
-                    if new_cells & set(existing.get_cells()):
-                        overlaps = True
-                        break
-                if not overlaps:
-                    self.boats.append(new_boat)
-            
-            # Check solvability
-            if self.is_solvable(self.boats, self.grid_size, self.exit_row):
-                break
-            # If not solvable and it was the last attempt, we keep it anyway but log it
-            if gen_attempt == max_gen_attempts - 1:
-                print("Warning: Could not guarantee solvability after 5 attempts")
-
+        if self._is_generating_puzzle:
+            return
+        self._is_generating_puzzle = True
+        self.generate_puzzle(seed=seed)
         # Reset counters
         self.move_count = 0
         self.start_time = time.ticks_ms()
@@ -548,6 +488,129 @@ class QuasiBoats(Activity):
         print(
             f"New game: seed {seed}, {len(self.boats)} boats, cell_size {self.cell_size}"
         )
+        self._is_generating_puzzle = False
+
+    def generate_puzzle(self, seed=None):
+        """Initiate puzzle generation, showing a 'generating' label and using a timer for responsiveness."""
+        # Clear existing boats immediately to prevent visual artifacts during generation
+        for boat in self.boats:
+            if boat.img:
+                boat.img.delete()
+        self.boats = []
+        self.selected_boat = None
+        self.dragging_boat = None
+
+        # Create and show the generating panel
+        if not hasattr(self, 'generating_panel_container') or self.generating_panel_container is None:
+            self.generating_panel_container = lv.obj(self.screen)
+            self.generating_panel_container.set_size(240, 60)  # Adjust size as needed
+            self.generating_panel_container.center()  # Center on screen
+            self.generating_panel_container.set_style_bg_color(lv.color_hex(self.wood_bg_color), 0)  # Wooden plank color
+            self.generating_panel_container.set_style_border_color(lv.color_hex(self.wood_border_color), 0)
+            self.generating_panel_container.set_style_radius(10, 0)
+            self.generating_panel_container.set_style_pad_all(10, 0)
+            self.generating_panel_container.set_flex_flow(lv.FLEX_FLOW.COLUMN)
+            self.generating_panel_container.set_flex_align(lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER, lv.FLEX_ALIGN.CENTER)
+            self.generating_panel_container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
+            self.generating_panel_container.remove_flag(lv.obj.FLAG.SCROLLABLE)
+        
+        if not hasattr(self, 'generating_label') or self.generating_label is None:
+            self.generating_label = lv.label(self.generating_panel_container)
+            self.generating_label.set_text("Generating puzzle...")
+            self.generating_label.set_style_text_font(lv.font_montserrat_20, 0)
+            self.generating_label.set_style_text_color(lv.color_hex(0xFFFFFF), 0)
+            self.generating_label.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
+            self.generating_label.align(lv.ALIGN.CENTER, 0, 0)
+        
+        self.generating_panel_container.remove_flag(lv.obj.FLAG.HIDDEN)
+        self.generating_label.set_text("Generating puzzle...") # Reset text if it was updated
+
+        # Initialize puzzle generation state
+        self._puzzle_generation_state = {
+            "seed": seed if seed is not None else random.randint(1, 999999),
+            "gen_attempt": 0,
+            "max_gen_attempts": 5,
+            "boats_to_generate": [], # Store boats generated in current attempt
+            "num_obstacles": min(self.grid_size + 1, 10),
+            "colors": ["white"],
+            "attempts_per_obstacle": 0,
+            "max_attempts_per_obstacle": 200,
+        }
+        self.current_seed = self._puzzle_generation_state["seed"]
+        self.seed_label.set_text(f"#{self.current_seed}")
+        random.seed(self.current_seed)
+
+        # Start the timer to continue puzzle generation in chunks
+        # Use lv.timer_create instead of lv.timer_create_basic().set_cb().set_period()
+        self._puzzle_generation_timer = lv.timer_create(self._continue_puzzle_generation, 10, None) # Run every 10ms
+
+    def _continue_puzzle_generation(self, timer):
+        """Continues puzzle generation in chunks to keep UI responsive."""
+        state = self._puzzle_generation_state
+        gen_attempt = state["gen_attempt"]
+        max_gen_attempts = state["max_gen_attempts"]
+
+        for i in range(100000000):
+            test=2+2
+        
+        if gen_attempt >= max_gen_attempts:
+            print("Warning: Could not guarantee solvability after 5 attempts")
+            self._finalize_puzzle_generation(timer)
+            return
+
+        # Clear boats from previous attempt
+        state["boats_to_generate"] = []
+        self.exit_row = self.grid_size // 2
+
+        # Create player boat
+        player_col = random.randint(0, max(0, self.grid_size - 2))
+        player_boat = Boat(self.exit_row, player_col, 2, True, True, "red")
+        state["boats_to_generate"].append(player_boat)
+
+        # Generate obstacle yachts
+        num_obstacles = state["num_obstacles"]
+        colors = state["colors"]
+        attempts_per_obstacle = 0
+        max_attempts_per_obstacle = state["max_attempts_per_obstacle"]
+
+        while len(state["boats_to_generate"]) < num_obstacles and attempts_per_obstacle < max_attempts_per_obstacle:
+            attempts_per_obstacle += 1
+            length = random.choice([2, 3])
+            is_horizontal = random.choice([True, False])
+            color = random.choice(colors)
+
+            if is_horizontal:
+                col = random.randint(0, self.grid_size - length)
+                row = random.randint(0, self.grid_size - 1)
+            else:
+                col = random.randint(0, self.grid_size - 1)
+                row = random.randint(0, self.grid_size - length)
+
+            new_boat = Boat(row, col, length, is_horizontal, False, color)
+            new_cells = set(new_boat.get_cells())
+            overlaps = False
+            for existing in state["boats_to_generate"]:
+                if new_cells & set(existing.get_cells()):
+                    overlaps = True
+                    break
+            if not overlaps:
+                state["boats_to_generate"].append(new_boat)
+        
+        # Check solvability
+        if self.is_solvable(state["boats_to_generate"], self.grid_size, self.exit_row):
+            self.boats = state["boats_to_generate"] # Assign generated boats to actual game boats
+            self._finalize_puzzle_generation(timer)
+        else:
+            state["gen_attempt"] += 1
+            self.generating_label.set_text(f"Generating puzzle...\n(Attempt {state['gen_attempt'] + 1}/{max_gen_attempts})")
+            # Timer will call this method again for the next attempt
+
+    def _finalize_puzzle_generation(self, timer):
+        """Finalize puzzle generation, hide label, and proceed with game setup."""
+        timer.delete() # Stop the timer
+        self.generating_panel_container.add_flag(lv.obj.FLAG.HIDDEN)
+        self.create_boat_images() # Create images for the generated boats
+        print(f"New game: seed {self.current_seed}, {len(self.boats)} boats, cell_size {self.cell_size}")
 
     def create_boat_images(self):
         """Create LVGL images for all boats"""
