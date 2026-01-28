@@ -137,6 +137,7 @@ class QuasiBoats(Activity):
     menu_modal = None
 
     # colors
+    wood_bg_color = 0x8B4513
     wood_border_color = 0x654321
 
     def onCreate(self):
@@ -271,7 +272,8 @@ class QuasiBoats(Activity):
         self.win_panel_container = lv.obj(self.screen)
         self.win_panel_container.set_size(200, 140) # Adjust size as needed
         self.win_panel_container.align_to(grid_container, lv.ALIGN.CENTER, 0, 0) # Centered on grid container
-        self.win_panel_container.set_style_bg_color(lv.color_hex(0x8B4513), 0)  # Wooden plank color
+        self.win_panel_container.set_style_bg_color(lv.color_hex(self.wood_bg_color), 0)  # Wooden plank color
+        self.win_panel_container.set_style_border_color(lv.color_hex(self.wood_border_color), 0)
         self.win_panel_container.set_style_radius(10, 0)
         self.win_panel_container.set_style_pad_all(10, 0)
         self.win_panel_container.set_flex_flow(lv.FLEX_FLOW.COLUMN)
@@ -292,7 +294,8 @@ class QuasiBoats(Activity):
         self.info_panel_container = lv.obj(self.screen)
         self.info_panel_container.set_size(self.RIGHT_PANEL_WIDTH, 70) # Adjusted size
         self.info_panel_container.set_pos(right_panel_x, 5)
-        self.info_panel_container.set_style_bg_color(lv.color_hex(0x8B4513), 0)  # Wooden plank color
+        self.info_panel_container.set_style_bg_color(lv.color_hex(self.wood_bg_color), 0)  # Wooden plank color
+        self.info_panel_container.set_style_border_color(lv.color_hex(self.wood_border_color), 0)
         self.info_panel_container.set_style_radius(5, 0)
         self.info_panel_container.set_style_pad_all(5, 0)
         self.info_panel_container.set_flex_flow(lv.FLEX_FLOW.COLUMN)
@@ -852,8 +855,8 @@ class QuasiBoats(Activity):
         exit_marker.set_pos(
             (self.grid_size - 1) * self.cell_size + int(self.cell_size*(1-hori_multiplier)), self.exit_row * self.cell_size
         )
-        exit_marker.set_style_bg_color(lv.color_hex(0x8B4513), 0)
-        exit_marker.set_style_border_color(lv.color_hex(0x654321), 0)
+        exit_marker.set_style_bg_color(lv.color_hex(self.wood_bg_color), 0)
+        exit_marker.set_style_border_color(lv.color_hex(self.wood_border_color), 0)
         exit_marker.set_style_border_width(2, 0)
         # exit_marker.set_style_radius(0, 0)
         # exit_marker.set_style_border_width(4, 0)
