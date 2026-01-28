@@ -830,6 +830,12 @@ class QuasiBoats(Activity):
 
         self._create_info_panel_labels(self.info_panel_container)
         self._create_win_label(self.grid_container)
+        # Re-initialize labels after recreation
+        self.moves_label.set_text(f"Moves\n{self.move_count}")
+        elapsed = time.ticks_diff(time.ticks_ms(), self.start_time) // 1000
+        minutes = elapsed // 60
+        seconds = elapsed % 60
+        self.time_label.set_text(f"{minutes}:{seconds:02d}")
 
         # Start new game
         self.new_game()
