@@ -123,11 +123,19 @@ class QuasiBoats(Activity):
     drag_dots = [] # Store dot objects for selected boat
     update_timer = None # Reference to LVGL timer for frame updates
 
+    # Waves
+    waves = []
+    num_waves = 30
+    wave_speed = 20 # pixels per second
+
     # UI Elements
     screen = None
     water_bg = None
     grid_container = None
     exit_row = 0
+
+    # Time tracking for animations
+    last_update_time = 0
 
     # UI labels
     moves_label = None
@@ -176,6 +184,20 @@ class QuasiBoats(Activity):
         self.setContentView(self.screen)
         print("Quasi Boats created")
 
+        self.last_update_time = time.ticks_ms()
+
+    def _create_wave_line(self, parent, x, y, width, height):
+        line = lv.line(parent)
+        points = [{"x": 0, "y": height}, {"x": width, "y": 0}]
+        line.set_points(points, 2)
+        line.set_width(width)
+        line.set_height(height)
+        line.set_pos(x, y)
+        line.set_style_line_width(2, 0)
+        line.set_style_line_color(lv.color_hex(0xADD8E6), 0) # Light blue
+        line.set_style_line_rounded(True, 0)
+        return line
+
     def calculate_cell_size(self):
         """Calculate cell size based on grid size to fit in fixed grid area"""
         self.cell_size = self.GRID_PIXEL_SIZE // self.grid_size
@@ -193,6 +215,25 @@ class QuasiBoats(Activity):
         self.water_bg.set_style_border_width(0, 0)
         self.water_bg.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
         self.water_bg.remove_flag(lv.obj.FLAG.SCROLLABLE)
+
+        # Create waves
+        for i in range(self.num_waves):
+            wave_width = 4
+            wave_height = wave_width
+            # wave_width = random.randint(self.SCREEN_WIDTH // 4, self.SCREEN_WIDTH // 2)
+            # wave_height = random.randint(10, 20)
+            x = random.randint(0, self.SCREEN_WIDTH)
+            y = random.randint(0, self.SCREEN_HEIGHT)
+            wave_obj = self._create_wave_line(self.water_bg, x, y, wave_width, wave_height)
+            self.waves.append({
+                "obj": wave_obj,
+                "x": float(x),
+                "y": float(y),
+                "width": float(wave_width),
+                "height": float(wave_height),
+                "speed_multiplier": 1 # Individual speed variation
+                # "speed_multiplier": random.uniform(0.7, 1.3) # Individual speed variation
+            })
 
         # Create grid container (fixed size, aligned left)
         # Added 4px for border to avoid clipping
@@ -899,11 +940,25 @@ class QuasiBoats(Activity):
 
     def update_frame(self, timer):
         """Main game loop - update timer and check key state"""
+        current_time = time.ticks_ms()
+        # Calculate delta_time in seconds
+        delta_time = (current_time - self.last_update_time) / 1000.0
+        self.last_update_time = current_time
+
         if not self.game_won:
             elapsed = time.ticks_diff(time.ticks_ms(), self.start_time) // 1000
             minutes = elapsed // 60
             seconds = elapsed % 60
             self.time_label.set_text(f"{minutes}:{seconds:02d}")
+
+        # Animate waves
+        for wave in self.waves:
+            wave["x"] += self.wave_speed * wave["speed_multiplier"] * delta_time
+            # If wave goes off screen to the right, reset its position to the left
+            if wave["x"] > self.SCREEN_WIDTH:
+                wave["x"] = -wave["width"]
+                wave["y"] = random.randint(0, self.SCREEN_HEIGHT) # Randomize y position
+            wave["obj"].set_pos(int(wave["x"]), int(wave["y"]))
 
         # Check if Enter/A key is released
         # Check if Enter/A key is released (only if not handled by boat directly)
