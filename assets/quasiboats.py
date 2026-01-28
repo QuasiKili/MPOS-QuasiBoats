@@ -580,7 +580,7 @@ class QuasiBoats(Activity):
     def _scramble_all_boats(self, boats, exit_row):
         """
         Scramble ALL boats (player and yachts) from solved state using legal moves.
-        Priority: Move player boat as far left as possible.
+        Strategy: Aggressively move player as far LEFT as possible, then move yachts to block the path.
         All moves must be legal (boats move along their orientation, can't pass through each other).
         """
         # Clone all boats
@@ -592,39 +592,79 @@ class QuasiBoats(Activity):
         player = scrambled[0]
         start_col = player.col
         
-        # Number of scramble attempts (more for larger grids)
-        num_scramble_moves = max(20, self.grid_size * 4)
-        moves_made = 0
+        # PHASE 1: Move player as far LEFT as possible
+        print(f"Phase 1: Moving player left from col {player.col}")
+        for attempt in range(100):  # Keep trying to move player left
+            moved_left = False
+            # Try moving left by various distances
+            for distance in [3, 2, 1]:
+                new_col = player.col - distance
+                if new_col >= 0 and self._can_move_incrementally(player, player.row, new_col, scrambled):
+                    player.col = new_col
+                    moved_left = True
+                    print(f"  -> Player moved left to col {player.col}")
+                    break
+            
+            if not moved_left:
+                # Player can't move left anymore, try moving some yachts to make room
+                yacht_moved = False
+                for _ in range(5):  # Try moving a few yachts
+                    yacht = random.choice([b for b in scrambled if not b.is_player])
+                    if self._try_legal_move(yacht, scrambled, exit_row):
+                        yacht_moved = True
+                
+                # If we moved yachts, try player again
+                if not yacht_moved:
+                    break  # Can't move anything, player is stuck
         
-        # Try many moves to scramble the puzzle
-        for _ in range(num_scramble_moves * 3):
-            # Prioritize moving player left (70% of the time if possible)
-            if random.random() < 0.7 and player.col > 0:
-                boat = player
-            else:
-                # Pick a random boat (including player)
-                boat = random.choice(scrambled)
-            
-            # Make a legal move for this boat
-            moved = self._try_legal_move(boat, scrambled, exit_row)
-            if moved:
-                moves_made += 1
-            
-            if moves_made >= num_scramble_moves:
+        # PHASE 2: Move yachts around to create blocking situations
+        print(f"Phase 2: Scrambling yachts to create obstacles")
+        num_yacht_moves = self.grid_size * 6  # Many moves for yachts
+        yacht_moves_made = 0
+        
+        for _ in range(num_yacht_moves * 2):
+            # Pick a random yacht (not player)
+            yachts = [b for b in scrambled if not b.is_player]
+            if not yachts:
                 break
+            
+            yacht = random.choice(yachts)
+            if self._try_legal_move(yacht, scrambled, exit_row):
+                yacht_moves_made += 1
+            
+            if yacht_moves_made >= num_yacht_moves:
+                break
+        
+        # PHASE 3: Try one more time to push player even further left
+        print(f"Phase 3: Final push to move player further left")
+        for attempt in range(50):
+            moved_left = False
+            for distance in [3, 2, 1]:
+                new_col = player.col - distance
+                if new_col >= 0 and self._can_move_incrementally(player, player.row, new_col, scrambled):
+                    player.col = new_col
+                    moved_left = True
+                    print(f"  -> Player moved left to col {player.col}")
+                    break
+            
+            if not moved_left:
+                # Try moving yachts out of the way
+                for _ in range(3):
+                    yacht = random.choice([b for b in scrambled if not b.is_player])
+                    self._try_legal_move(yacht, scrambled, exit_row)
         
         # Verify player stayed on exit row
         if player.row != exit_row:
             print(f"ERROR: Player moved off exit row!")
             return None
         
-        # Check if player moved at all from starting position
         distance_moved = start_col - player.col
-        print(f"Scramble: player moved from col {start_col} to col {player.col}, distance={distance_moved}, moves_made={moves_made}")
+        print(f"FINAL: Player moved from col {start_col} to col {player.col}, distance={distance_moved}")
         
-        # Require at least SOME movement (at least 1 cell, or at least 20% of grid width)
-        min_distance = max(1, self.grid_size // 5)
+        # Require significant movement - player should be at least halfway to the left
+        min_distance = max(2, self.grid_size // 2)
         if distance_moved >= min_distance:
+            print(f"  -> SUCCESS! Distance {distance_moved} >= minimum {min_distance}")
             return scrambled
         
         print(f"  -> Failed: distance {distance_moved} < minimum {min_distance}")
