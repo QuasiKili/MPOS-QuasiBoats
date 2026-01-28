@@ -478,62 +478,17 @@ class QuasiBoats(Activity):
 
         random.seed(seed)
 
-        # Generate puzzle with solvability check
-        max_gen_attempts = 5
-        for gen_attempt in range(max_gen_attempts):
-            # Clear existing boats
-            for boat in self.boats:
-                if boat.img:
-                    boat.img.delete()
-            self.boats = []
-            self.selected_boat = None
-            self.dragging_boat = None
+        # Clear existing boats
+        for boat in self.boats:
+            if boat.img:
+                boat.img.delete()
+        self.boats = []
+        self.selected_boat = None
+        self.dragging_boat = None
 
-            # Generate puzzle
-            self.exit_row = self.grid_size // 2
-
-            # Create player boat
-            player_col = random.randint(0, max(0, self.grid_size - 2)) # Player boat is always length 2
-            self.player_boat = Boat(self.exit_row, player_col, 2, True, True, "red")
-            self.boats.append(self.player_boat)
-
-            # Generate obstacle yachts
-            num_obstacles = min(self.grid_size + 1, 10)
-            # Only use white yachts
-            colors = ["white"]
-
-            attempts = 0
-            max_attempts = 200
-            while len(self.boats) < num_obstacles and attempts < max_attempts:
-                attempts += 1
-                # Only use lengths 2 and 3 for yachts
-                length = random.choice([2, 3])
-                is_horizontal = random.choice([True, False])
-                color = random.choice(colors)
-
-                if is_horizontal:
-                    col = random.randint(0, self.grid_size - length)
-                    row = random.randint(0, self.grid_size - 1)
-                else:
-                    col = random.randint(0, self.grid_size - 1)
-                    row = random.randint(0, self.grid_size - length)
-
-                new_boat = Boat(row, col, length, is_horizontal, False, color)
-                new_cells = set(new_boat.get_cells())
-                overlaps = False
-                for existing in self.boats:
-                    if new_cells & set(existing.get_cells()):
-                        overlaps = True
-                        break
-                if not overlaps:
-                    self.boats.append(new_boat)
-            
-            # Check solvability
-            if self.is_solvable(self.boats, self.grid_size, self.exit_row):
-                break
-            # If not solvable and it was the last attempt, we keep it anyway but log it
-            if gen_attempt == max_gen_attempts - 1:
-                print("Warning: Could not guarantee solvability after 5 attempts")
+        # Generate puzzle using improved algorithm
+        self.boats = self.generate_puzzle_backward_scramble()
+        self.player_boat = self.boats[0]
 
         # Reset counters
         self.move_count = 0
@@ -548,6 +503,288 @@ class QuasiBoats(Activity):
         print(
             f"New game: seed {seed}, {len(self.boats)} boats, cell_size {self.cell_size}"
         )
+
+    def generate_puzzle_backward_scramble(self):
+        """
+        Generate puzzle by starting from solved position and unsolving.
+        Algorithm:
+        1. Place player boat at exit (solved position)
+        2. Place yacht obstacles (lengths 2-3, no horizontal on player row)
+        3. Make random LEGAL moves on ALL boats (player and yachts)
+        4. Try to move player as far left as possible
+        5. Verify puzzle is still solvable
+        """
+        exit_row = self.grid_size // 2
+        self.exit_row = exit_row
+
+        best_boats = None
+        best_player_distance = 0
+        max_attempts = 30
+
+        for attempt in range(max_attempts):
+            # Step 1: Place player boat in SOLVED position (at exit)
+            player_col = self.grid_size - 2  # Rightmost position for length-2 boat
+            player = Boat(exit_row, player_col, 2, True, is_player=True, color="red")
+            boats = [player]
+
+            # Step 2: Place yacht obstacles
+            num_yachts = min(self.grid_size + 1, max(4, (self.grid_size * self.grid_size - 2) // 4))
+            
+            yacht_color = "white"
+            
+            for i in range(num_yachts):
+                length = random.choice([2, 3])
+                
+                placed = False
+                for _ in range(100):
+                    is_horizontal = random.choice([True, False])
+                    
+                    if is_horizontal:
+                        row = random.randint(0, self.grid_size - 1)
+                        col = random.randint(0, self.grid_size - length)
+                        # Don't place horizontal boats on exit row
+                        if row == exit_row:
+                            continue
+                    else:
+                        row = random.randint(0, self.grid_size - length)
+                        col = random.randint(0, self.grid_size - 1)
+                    
+                    yacht = Boat(row, col, length, is_horizontal, 
+                               is_player=False, color=yacht_color)
+                    
+                    if not self._boats_collide_with_list(yacht, boats):
+                        boats.append(yacht)
+                        placed = True
+                        break
+
+            # Step 3: Scramble ALL boats (player and yachts) with legal moves
+            scrambled = self._scramble_all_boats(boats, exit_row)
+            
+            if scrambled:
+                player_distance = scrambled[0].col  # Distance from left edge
+                
+                # Step 4: Verify puzzle is still solvable
+                if self.is_solvable(scrambled, self.grid_size, exit_row):
+                    if player_distance > best_player_distance:
+                        best_player_distance = player_distance
+                        best_boats = scrambled
+
+        # Return best puzzle or fallback
+        if best_boats:
+            print(f"Generated solvable puzzle: player at col {best_boats[0].col}")
+            return best_boats
+        
+        print("Using fallback puzzle generation")
+        return self._generate_fallback_puzzle(exit_row)
+
+    def _scramble_all_boats(self, boats, exit_row):
+        """
+        Scramble ALL boats (player and yachts) from solved state using legal moves.
+        Priority: Move player boat as far left as possible.
+        All moves must be legal (boats move along their orientation, can't pass through each other).
+        """
+        # Clone all boats
+        scrambled = []
+        for b in boats:
+            new_boat = Boat(b.row, b.col, b.length, b.is_horizontal, b.is_player, b.color)
+            scrambled.append(new_boat)
+        
+        player = scrambled[0]
+        start_col = player.col
+        
+        # Number of scramble attempts (more for larger grids)
+        num_scramble_moves = max(20, self.grid_size * 4)
+        moves_made = 0
+        
+        # Try many moves to scramble the puzzle
+        for _ in range(num_scramble_moves * 3):
+            # Prioritize moving player left (70% of the time if possible)
+            if random.random() < 0.7 and player.col > 0:
+                boat = player
+            else:
+                # Pick a random boat (including player)
+                boat = random.choice(scrambled)
+            
+            # Make a legal move for this boat
+            moved = self._try_legal_move(boat, scrambled, exit_row)
+            if moved:
+                moves_made += 1
+            
+            if moves_made >= num_scramble_moves:
+                break
+        
+        # Verify player stayed on exit row
+        if player.row != exit_row:
+            print(f"ERROR: Player moved off exit row!")
+            return None
+        
+        # Check if player moved at all from starting position
+        distance_moved = start_col - player.col
+        print(f"Scramble: player moved from col {start_col} to col {player.col}, distance={distance_moved}, moves_made={moves_made}")
+        
+        # Require at least SOME movement (at least 1 cell, or at least 20% of grid width)
+        min_distance = max(1, self.grid_size // 5)
+        if distance_moved >= min_distance:
+            return scrambled
+        
+        print(f"  -> Failed: distance {distance_moved} < minimum {min_distance}")
+        return None
+
+    def _try_legal_move(self, boat, all_boats, exit_row):
+        """
+        Try to make one legal move for the given boat.
+        Returns True if move was successful, False otherwise.
+        """
+        # Player boat: strongly prefer moving left
+        if boat.is_player:
+            # Try moving left first
+            if boat.col > 0:
+                if random.random() < 0.9:  # 90% try left first
+                    for distance in [3, 2, 1]:  # Try longer moves first
+                        new_col = boat.col - distance
+                        if new_col >= 0 and self._can_move_incrementally(boat, boat.row, new_col, all_boats):
+                            boat.col = new_col
+                            return True
+            
+            # Otherwise try moving right (rarely)
+            if boat.col + boat.length < self.grid_size:
+                for distance in [1, 2, 3]:
+                    new_col = boat.col + distance
+                    if new_col + boat.length <= self.grid_size and self._can_move_incrementally(boat, boat.row, new_col, all_boats):
+                        boat.col = new_col
+                        return True
+        
+        # Non-player boats: move randomly along their orientation
+        else:
+            if boat.is_horizontal:
+                # Try moving left or right
+                direction = random.choice([-1, 1])
+                distance = random.randint(1, min(3, self.grid_size // 2))
+                new_col = boat.col + (direction * distance)
+                
+                if 0 <= new_col and new_col + boat.length <= self.grid_size:
+                    if self._can_move_incrementally(boat, boat.row, new_col, all_boats):
+                        boat.col = new_col
+                        return True
+            else:
+                # Try moving up or down
+                direction = random.choice([-1, 1])
+                distance = random.randint(1, min(3, self.grid_size // 2))
+                new_row = boat.row + (direction * distance)
+                
+                if 0 <= new_row and new_row + boat.length <= self.grid_size:
+                    if self._can_move_incrementally(boat, new_row, boat.col, all_boats):
+                        boat.row = new_row
+                        return True
+        
+        return False
+
+    def _can_move_incrementally(self, boat, target_row, target_col, all_boats):
+        """
+        Check if boat can move to target position incrementally (step by step).
+        CRITICAL: Boats can only move along their orientation:
+        - Horizontal boats: can only change column (target_row must equal boat.row)
+        - Vertical boats: can only change row (target_col must equal boat.col)
+        """
+        # Enforce orientation-based movement constraints
+        if boat.is_horizontal:
+            # Horizontal boats can ONLY move horizontally (row stays the same)
+            if target_row != boat.row:
+                return False
+            
+            # Check bounds
+            if target_col < 0 or target_col + boat.length > self.grid_size:
+                return False
+            
+            # Check each step along the path
+            current_col = boat.col
+            step = 1 if target_col > current_col else -1
+            
+            while current_col != target_col:
+                current_col += step
+                if not self._is_position_free(boat, boat.row, current_col, all_boats):
+                    return False
+            return True
+        else:
+            # Vertical boats can ONLY move vertically (column stays the same)
+            if target_col != boat.col:
+                return False
+            
+            # Check bounds
+            if target_row < 0 or target_row + boat.length > self.grid_size:
+                return False
+            
+            # Check each step along the path
+            current_row = boat.row
+            step = 1 if target_row > current_row else -1
+            
+            while current_row != target_row:
+                current_row += step
+                if not self._is_position_free(boat, current_row, boat.col, all_boats):
+                    return False
+            return True
+
+    def _is_position_free(self, boat, row, col, all_boats):
+        """Check if boat can occupy position (row, col) without collision"""
+        # Get cells this boat would occupy at new position
+        new_cells = set()
+        for i in range(boat.length):
+            if boat.is_horizontal:
+                new_cells.add((row, col + i))
+            else:
+                new_cells.add((row + i, col))
+        
+        # Check against all other boats
+        for other in all_boats:
+            if other is boat:
+                continue
+            other_cells = set(other.get_cells())
+            if new_cells & other_cells:  # Intersection
+                return False
+        
+        return True
+
+    def _boats_collide_with_list(self, boat, boat_list):
+        """Check if boat collides with any boat in the list"""
+        boat_cells = set(boat.get_cells())
+        for other in boat_list:
+            if set(other.get_cells()) & boat_cells:
+                return True
+        return False
+
+    def _generate_fallback_puzzle(self, exit_row):
+        """Simple fallback puzzle when backward scrambling fails"""
+        player = Boat(exit_row, 0, 2, True, is_player=True, color="red")
+        boats = [player]
+        
+        # Add blocking yachts
+        num_yachts = max(4, self.grid_size - 1)
+        
+        for i in range(num_yachts):
+            length = random.choice([2, 3])
+            placed = False
+            
+            for _ in range(50):
+                is_horizontal = random.choice([True, False])
+                
+                if is_horizontal:
+                    row = random.randint(0, self.grid_size - 1)
+                    col = random.randint(0, self.grid_size - length)
+                    if row == exit_row:
+                        continue
+                else:
+                    row = random.randint(0, self.grid_size - length)
+                    col = random.randint(0, self.grid_size - 1)
+                
+                yacht = Boat(row, col, length, is_horizontal, 
+                           is_player=False, color="white")
+                
+                if not self._boats_collide_with_list(yacht, boats):
+                    boats.append(yacht)
+                    placed = True
+                    break
+        
+        return boats
 
     def create_boat_images(self):
         """Create LVGL images for all boats"""
@@ -1109,4 +1346,3 @@ class QuasiBoats(Activity):
         if self.update_timer:
             self.update_timer.delete()
             self.update_timer = None
-
