@@ -194,53 +194,9 @@ class QuasiBoats(Activity):
         # Added 4px for border to avoid clipping
         grid_pixel_size = self.grid_size * self.cell_size + 4
 
-        self.grid_container = lv.obj(self.screen)
-        self.grid_container.set_size(grid_pixel_size, grid_pixel_size)
-        self.grid_container.set_pos(self.grid_offset_x - 2, self.grid_offset_y - 2)
-        self.grid_container.set_style_bg_opa(0, 0)  # Transparent
-        self.grid_container.set_style_border_width(2, 0)
-        self.grid_container.set_style_border_color(lv.color_hex(0x2C3E50), 0)
-        self.grid_container.set_style_pad_all(2, 0)  # Avoid clipping
-        self.grid_container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
-        self.grid_container.remove_flag(lv.obj.FLAG.SCROLLABLE)
+        self._create_grid_container(grid_pixel_size)
 
-        # Create exit indicator (wooden dock on right edge, middle row)
-        # self.exit_row = self.grid_size // 2
-        # exit_marker = lv.obj(self.grid_container)
-        # exit_marker.set_size(self.cell_size, self.cell_size)
-        # exit_marker.set_pos(
-        #     (self.grid_size - 1) * self.cell_size, self.exit_row * self.cell_size
-        # )
-        # # exit_marker.set_style_bg_color(lv.color_hex(0x8B4513), 0)  # Brown dock
-        # # exit_marker.set_style_border_color(lv.color_hex(0x654321), 0)
-        # # exit_marker.set_style_border_width(2, 0)
-        # exit_marker.set_style_radius(0, 0)
-        # exit_marker.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
-        # exit_marker.remove_flag(lv.obj.FLAG.SCROLLABLE)
-
-
-        # Arrow on exit
-        # arrow_label = lv.label(exit_marker)
-        arrow_label = lv.label(self.grid_container)
-        self.exit_row = self.grid_size // 2
-        # arrow_label.set_size(self.cell_size, self.cell_size)
-        arrow_label.set_size(self.cell_size, self.cell_size)
-        arrow_label.set_pos(
-            ((self.grid_size - 1) * self.cell_size) + self.exit_row, (self.exit_row * self.cell_size) + int(self.exit_row*3)
-        )
-        arrow_label.set_text(lv.SYMBOL.RIGHT)
-        arrow_label.set_style_text_color(lv.color_hex(0xFFD700), 0)
-        arrow_label.set_style_size(self.cell_size, self.cell_size, 0)
-        # arrow_label.set_style_bg_color(lv.color_hex(0x8B4513), 0)  # Brown dock
-        # arrow_label.set_style_border_color(lv.color_hex(0x654321), 0)
-        # arrow_label.set_style_border_width(2, 0)
-        # arrow_label.set_style_radius(0, 0)
-        arrow_label.set_style_text_align(lv.TEXT_ALIGN.CENTER, 0)
-
-        # arrow_label.set_style_bg_color(lv.color_hex(0x00D7FF), 0)
-        arrow_label.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
-        arrow_label.remove_flag(lv.obj.FLAG.SCROLLABLE)
-        # arrow_label.center()
+        self._create_exit_marker()
 
 
         # Right panel - Info and controls
@@ -302,6 +258,7 @@ class QuasiBoats(Activity):
         self._add_focus_style(new_btn)
 
         # Win message (hidden initially)
+        
         self.win_label = lv.label(self.screen)
         self.win_label.set_text("You Win!")
         self.win_label.set_style_text_font(lv.font_montserrat_28_compressed, 0)
@@ -822,32 +779,9 @@ class QuasiBoats(Activity):
         # Recreate grid container with new cell size
         grid_pixel_size = self.grid_size * self.cell_size + 4
 
-        self.grid_container = lv.obj(self.screen)
-        self.grid_container.set_size(grid_pixel_size, grid_pixel_size)
-        self.grid_container.set_pos(self.grid_offset_x - 2, self.grid_offset_y - 2)
-        self.grid_container.set_style_bg_opa(0, 0)
-        self.grid_container.set_style_border_width(2, 0)
-        self.grid_container.set_style_border_color(lv.color_hex(0x2C3E50), 0)
-        self.grid_container.set_style_pad_all(2, 0)
-        self.grid_container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
-        self.grid_container.remove_flag(lv.obj.FLAG.SCROLLABLE)
-
-        # Recreate exit marker
-        self.exit_row = self.grid_size // 2
-        exit_marker = lv.obj(self.grid_container)
-        exit_marker.set_size(self.cell_size, self.cell_size)
-        exit_marker.set_pos(
-            (self.grid_size - 1) * self.cell_size, self.exit_row * self.cell_size
-        )
-        exit_marker.set_style_bg_color(lv.color_hex(0x8B4513), 0)
-        exit_marker.set_style_border_color(lv.color_hex(0x654321), 0)
-        exit_marker.set_style_border_width(2, 0)
-        exit_marker.set_style_radius(0, 0)
-
-        arrow_label = lv.label(exit_marker)
-        arrow_label.set_text(lv.SYMBOL.RIGHT)
-        arrow_label.set_style_text_color(lv.color_hex(0xFFD700), 0)
-        arrow_label.center()
+        
+        self._create_grid_container(grid_pixel_size)
+        self._create_exit_marker()
 
         # Recreate win label
         self.win_label = lv.label(self.screen)
@@ -859,6 +793,48 @@ class QuasiBoats(Activity):
 
         # Start new game
         self.new_game()
+
+    def _create_grid_container(self, grid_pixel_size):
+        self.grid_container = lv.obj(self.screen)
+        self.grid_container.set_size(grid_pixel_size, grid_pixel_size)
+        self.grid_container.set_pos(self.grid_offset_x - 2, self.grid_offset_y - 2)
+        self.grid_container.set_style_bg_opa(0, 0)
+        self.grid_container.set_style_border_width(1, 0)
+        self.grid_container.set_style_border_color(lv.color_hex(0x4C555E), 0)
+        self.grid_container.set_style_border_color(lv.color_hex(0x2C3E50), 0)
+        self.grid_container.set_style_pad_all(2, 0)
+        self.grid_container.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
+        self.grid_container.remove_flag(lv.obj.FLAG.SCROLLABLE)
+
+    def _create_exit_marker(self):
+        """Create the exit marker and arrow label"""
+        self.exit_row = self.grid_size // 2
+        exit_marker = lv.obj(self.grid_container)
+        hori_multiplier = 0.3
+        exit_marker.set_size(int(self.cell_size*hori_multiplier), self.cell_size)
+        exit_marker.set_pos(
+            (self.grid_size - 1) * self.cell_size + int(self.cell_size*(1-hori_multiplier)), self.exit_row * self.cell_size
+        )
+        exit_marker.set_style_bg_color(lv.color_hex(0x8B4513), 0)
+        exit_marker.set_style_border_color(lv.color_hex(0x654321), 0)
+        exit_marker.set_style_border_width(2, 0)
+        # exit_marker.set_style_radius(0, 0)
+        # exit_marker.set_style_border_width(4, 0)
+        exit_marker.set_scrollbar_mode(lv.SCROLLBAR_MODE.OFF)
+        exit_marker.remove_flag(lv.obj.FLAG.SCROLLABLE)
+
+        arrow_label = lv.label(self.grid_container)
+        arrow_label.set_size(self.cell_size, self.cell_size)
+        print(f"cell size {self.cell_size}")
+        arrow_label.set_text(lv.SYMBOL.RIGHT)
+        arrow_label.set_style_text_color(lv.color_hex(0xFFD700), 0)
+       
+        arrow_label.set_style_text_font(lv.font_montserrat_24, 0) # Increased font size
+        arrow_label.set_pos(
+            (self.grid_size - 1) * self.cell_size, (self.exit_row * self.cell_size) + (round((self.cell_size/2)- 13))
+        )
+    
+
 
     def on_key(self, event):
         """Handle keyboard input"""
@@ -1032,3 +1008,4 @@ class QuasiBoats(Activity):
         if self.update_timer:
             self.update_timer.delete()
             self.update_timer = None
+
